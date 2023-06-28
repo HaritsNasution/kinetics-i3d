@@ -25,11 +25,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import sonnet as snt
 import tensorflow as tf
 
 
-class Unit3D(snt.Module):
+class Unit3D(tf.keras.Model):
   """Basic unit containing Conv3D + BatchNorm + non-linearity."""
 
   def __init__(self, output_channels,
@@ -40,7 +39,7 @@ class Unit3D(snt.Module):
                with_bias=False,
                name='unit_3d'):
     """Initializes Unit3D module."""
-    super(Unit3D, self).__init__(name=name)
+    super().__init__()
     self._output_channels = output_channels
     self._kernel_shape = kernel_shape
     self._stride = stride
@@ -48,7 +47,7 @@ class Unit3D(snt.Module):
     self._activation_fn = activation_fn
     self._with_bias = with_bias
 
-  def __call__(self, inputs, is_training):
+  def call(self, inputs):
     """Connects the module to inputs.
 
     Args:
@@ -58,20 +57,19 @@ class Unit3D(snt.Module):
     Returns:
       Outputs from the module.
     """
-    net = snt.Conv3D(output_channels=self._output_channels,
-                     kernel_shape=self._kernel_shape,
+    net = tf.keras.layers.Conv3D(filters=self._output_channels,
+                     kernel_size=self._kernel_shape,
                      stride=self._stride,
-                     padding=snt.pad.same,
-                     with_bias=self._with_bias)(inputs)
+                     padding='same',
+                     use_bias=self._with_bias)(inputs)
     if self._use_batch_norm:
-      bn = snt.BatchNorm(create_scale=False, create_offset=False)
-      net = bn(net, is_training=is_training, test_local_stats=False)
+      net = tf.keras.layers.BatchNormalization()(net)
     if self._activation_fn is not None:
       net = self._activation_fn(net)
     return net
 
 
-class InceptionI3d(snt.Module):
+class InceptionI3d(tf.keras.Model):
   """Inception-v1 I3D architecture.
 
   The model is introduced in:
@@ -141,7 +139,7 @@ class InceptionI3d(snt.Module):
     self._spatial_squeeze = spatial_squeeze
     self._final_endpoint = final_endpoint
 
-  def __call__(self, inputs, is_training, dropout_keep_prob=1.0):
+  def call(self, inputs, dropout_keep_prob=1.0):
     """Connects the model to inputs.
 
     Args:
@@ -167,27 +165,27 @@ class InceptionI3d(snt.Module):
     end_points = {}
     end_point = 'Conv3d_1a_7x7'
     net = Unit3D(output_channels=64, kernel_shape=[7, 7, 7],
-                 stride=[2, 2, 2], name=end_point)(net, is_training=is_training)
+                 stride=[2, 2, 2], name=end_point)(net)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
     end_point = 'MaxPool3d_2a_3x3'
     net = tf.nn.max_pool3d(net, ksize=[1, 1, 3, 3, 1], strides=[1, 1, 2, 2, 1],
-                           padding=snt.pad.same, name=end_point)
+                           padding='SAME', name=end_point)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
     end_point = 'Conv3d_2b_1x1'
     net = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                 name=end_point)(net, is_training=is_training)
+                 name=end_point)(net)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
     end_point = 'Conv3d_2c_3x3'
     net = Unit3D(output_channels=192, kernel_shape=[3, 3, 3],
-                 name=end_point)(net, is_training=is_training)
+                 name=end_point)(net)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
     end_point = 'MaxPool3d_3a_3x3'
     net = tf.nn.max_pool3d(net, ksize=[1, 1, 3, 3, 1], strides=[1, 1, 2, 2, 1],
-                           padding=snt.pad.same, name=end_point)
+                           padding='SAME', name=end_point)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
@@ -195,26 +193,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=96, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=128, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=16, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=32, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=32, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
 
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
@@ -224,33 +219,30 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=192, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=32, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=96, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
     end_point = 'MaxPool3d_4a_3x3'
     net = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1], strides=[1, 2, 2, 2, 1],
-                           padding=snt.pad.same, name=end_point)
+                           padding='SAME', name=end_point)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
@@ -258,26 +250,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=192, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=96, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=208, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=16, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=48, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -286,26 +275,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=160, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=112, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=224, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=24, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=64, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -314,26 +300,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=256, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=24, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=64, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -342,26 +325,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=112, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=144, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=288, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=32, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=64, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=64, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -370,33 +350,30 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=256, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=160, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=320, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=32, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=128, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
     end_point = 'MaxPool3d_5a_2x2'
     net = tf.nn.max_pool3d(net, ksize=[1, 2, 2, 2, 1], strides=[1, 2, 2, 2, 1],
-                           padding=snt.pad.same, name=end_point)
+                           padding='SAME', name=end_point)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
 
@@ -404,26 +381,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=256, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=160, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=320, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=32, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=128, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0a_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0a_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -432,26 +406,23 @@ class InceptionI3d(snt.Module):
     with tf.variable_scope(end_point):
       with tf.variable_scope('Branch_0'):
         branch_0 = Unit3D(output_channels=384, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
       with tf.variable_scope('Branch_1'):
         branch_1 = Unit3D(output_channels=192, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_1 = Unit3D(output_channels=384, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_1,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_1)
       with tf.variable_scope('Branch_2'):
         branch_2 = Unit3D(output_channels=48, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0a_1x1')(net, is_training=is_training)
+                          name='Conv3d_0a_1x1')(net)
         branch_2 = Unit3D(output_channels=128, kernel_shape=[3, 3, 3],
-                          name='Conv3d_0b_3x3')(branch_2,
-                                                is_training=is_training)
+                          name='Conv3d_0b_3x3')(branch_2)
       with tf.variable_scope('Branch_3'):
         branch_3 = tf.nn.max_pool3d(net, ksize=[1, 3, 3, 3, 1],
-                                    strides=[1, 1, 1, 1, 1], padding=snt.pad.same,
+                                    strides=[1, 1, 1, 1, 1], padding='SAME',
                                     name='MaxPool3d_0a_3x3')
         branch_3 = Unit3D(output_channels=128, kernel_shape=[1, 1, 1],
-                          name='Conv3d_0b_1x1')(branch_3,
-                                                is_training=is_training)
+                          name='Conv3d_0b_1x1')(branch_3)
       net = tf.concat([branch_0, branch_1, branch_2, branch_3], 4)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
@@ -459,14 +430,14 @@ class InceptionI3d(snt.Module):
     end_point = 'Logits'
     with tf.variable_scope(end_point):
       net = tf.nn.avg_pool3d(net, ksize=[1, 2, 7, 7, 1],
-                             strides=[1, 1, 1, 1, 1], padding=snt.VALID)
+                             strides=[1, 1, 1, 1, 1], padding='VALID')
       net = tf.nn.dropout(net, dropout_keep_prob)
       logits = Unit3D(output_channels=self._num_classes,
                       kernel_shape=[1, 1, 1],
                       activation_fn=None,
                       use_batch_norm=False,
                       with_bias=True,
-                      name='Conv3d_0c_1x1')(net, is_training=is_training)
+                      name='Conv3d_0c_1x1')(net)
       if self._spatial_squeeze:
         logits = tf.squeeze(logits, [2, 3], name='SpatialSqueeze')
     averaged_logits = tf.reduce_mean(logits, axis=1)
