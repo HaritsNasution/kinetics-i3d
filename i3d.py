@@ -48,7 +48,7 @@ class Unit3D(snt.Module):
     self._activation_fn = activation_fn
     self._use_bias = use_bias
 
-  def _build(self, inputs, is_training):
+  def __call__(self, inputs, is_training):
     """Connects the module to inputs.
 
     Args:
