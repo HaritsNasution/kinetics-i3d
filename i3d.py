@@ -36,16 +36,16 @@ class Unit3D(tf.keras.Model):
                stride=(1, 1, 1),
                activation_fn=tf.nn.relu,
                use_batch_norm=True,
-               with_bias=False,
+               use_bias=False,
                name='unit_3d'):
     """Initializes Unit3D module."""
-    super().__init__()
+    super(Unit3D, self).__init__(name=name)
     self._output_channels = output_channels
     self._kernel_shape = kernel_shape
     self._stride = stride
     self._use_batch_norm = use_batch_norm
     self._activation_fn = activation_fn
-    self._with_bias = with_bias
+    self._use_bias = use_bias
 
   def call(self, inputs):
     """Connects the module to inputs.
@@ -61,7 +61,7 @@ class Unit3D(tf.keras.Model):
                      kernel_size=self._kernel_shape,
                      stride=self._stride,
                      padding='same',
-                     use_bias=self._with_bias)(inputs)
+                     use_bias=self._use_bias)(inputs)
     if self._use_batch_norm:
       net = tf.keras.layers.BatchNormalization()(net)
     if self._activation_fn is not None:
@@ -436,7 +436,7 @@ class InceptionI3d(tf.keras.Model):
                       kernel_shape=[1, 1, 1],
                       activation_fn=None,
                       use_batch_norm=False,
-                      with_bias=True,
+                      use_bias=True,
                       name='Conv3d_0c_1x1')(net)
       if self._spatial_squeeze:
         logits = tf.squeeze(logits, [2, 3], name='SpatialSqueeze')
