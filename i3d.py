@@ -139,7 +139,7 @@ class InceptionI3d(tf.keras.Model):
     self._spatial_squeeze = spatial_squeeze
     self._final_endpoint = final_endpoint
 
-  def call(self, inputs, dropout_keep_prob=1.0):
+  def call(self, inputs, dropout_keep_prob=0.5):
     """Connects the model to inputs.
 
     Args:
