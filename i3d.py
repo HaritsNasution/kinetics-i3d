@@ -37,7 +37,7 @@ class Unit3D(snt.Module):
                stride=(1, 1, 1),
                activation_fn=tf.nn.relu,
                use_batch_norm=True,
-               use_bias=False,
+               with_bias=False,
                name='unit_3d'):
     """Initializes Unit3D module."""
     super(Unit3D, self).__init__(name=name)
@@ -46,7 +46,7 @@ class Unit3D(snt.Module):
     self._stride = stride
     self._use_batch_norm = use_batch_norm
     self._activation_fn = activation_fn
-    self._use_bias = use_bias
+    self._with_bias = with_bias
 
   def __call__(self, inputs, is_training):
     """Connects the module to inputs.
@@ -62,7 +62,7 @@ class Unit3D(snt.Module):
                      kernel_shape=self._kernel_shape,
                      stride=self._stride,
                      padding=snt.pad.same,
-                     use_bias=self._use_bias)(inputs)
+                     with_bias=self._with_bias)(inputs)
     if self._use_batch_norm:
       bn = snt.BatchNorm()
       net = bn(net, is_training=is_training, test_local_stats=False)
@@ -465,7 +465,7 @@ class InceptionI3d(snt.Module):
                       kernel_shape=[1, 1, 1],
                       activation_fn=None,
                       use_batch_norm=False,
-                      use_bias=True,
+                      with_bias=True,
                       name='Conv3d_0c_1x1')(net, is_training=is_training)
       if self._spatial_squeeze:
         logits = tf.squeeze(logits, [2, 3], name='SpatialSqueeze')
