@@ -28,7 +28,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 
-class Unit3D(tf.keras.Model):
+class Unit3D(tf.keras.layers.Layer):
   """Basic unit containing Conv3D + BatchNorm + non-linearity."""
 
   def __init__(self, output_channels,
