@@ -29,7 +29,7 @@ import sonnet as snt
 import tensorflow as tf
 
 
-class Unit3D(snt.AbstractModule):
+class Unit3D(snt.Module):
   """Basic unit containing Conv3D + BatchNorm + non-linearity."""
 
   def __init__(self, output_channels,
@@ -71,7 +71,7 @@ class Unit3D(snt.AbstractModule):
     return net
 
 
-class InceptionI3d(snt.AbstractModule):
+class InceptionI3d(snt.Module):
   """Inception-v1 I3D architecture.
 
   The model is introduced in:
