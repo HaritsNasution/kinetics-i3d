@@ -33,7 +33,7 @@ class Unit3D(tf.keras.Model):
 
   def __init__(self, output_channels,
                kernel_shape=(1, 1, 1),
-               stride=(1, 1, 1),
+               strides=(1, 1, 1),
                activation_fn=tf.nn.relu,
                use_batch_norm=True,
                use_bias=False,
@@ -42,7 +42,7 @@ class Unit3D(tf.keras.Model):
     super(Unit3D, self).__init__(name=name)
     self._output_channels = output_channels
     self._kernel_shape = kernel_shape
-    self._stride = stride
+    self._strides = strides
     self._use_batch_norm = use_batch_norm
     self._activation_fn = activation_fn
     self._use_bias = use_bias
@@ -59,7 +59,7 @@ class Unit3D(tf.keras.Model):
     """
     net = tf.keras.layers.Conv3D(filters=self._output_channels,
                      kernel_size=self._kernel_shape,
-                     stride=self._stride,
+                     strides=self._strides,
                      padding='same',
                      use_bias=self._use_bias)(inputs)
     if self._use_batch_norm:
@@ -165,7 +165,7 @@ class InceptionI3d(tf.keras.Model):
     end_points = {}
     end_point = 'Conv3d_1a_7x7'
     net = Unit3D(output_channels=64, kernel_shape=[7, 7, 7],
-                 stride=[2, 2, 2], name=end_point)(net)
+                 strides=[2, 2, 2], name=end_point)(net)
     end_points[end_point] = net
     if self._final_endpoint == end_point: return net, end_points
     end_point = 'MaxPool3d_2a_3x3'
